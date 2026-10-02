@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abrindo o Voxel Cut</title>
+<style>
+  :root { --bg:#0B0E14; --text:#eceef2; --muted:#8e9ab0; --blue:#3b82f6; --mint:#10b981; }
+  html, body { margin:0; height:100%; background:radial-gradient(ellipse at 50% 38%, #1a2640 0%, #0B0E14 70%); color:var(--text);
+               font:14px/1.45 system-ui, "Segoe UI", sans-serif; overflow:hidden; }
+  main { height:100%; display:grid; place-items:center; }
+  .box { display:flex; flex-direction:column; align-items:center; gap:18px; }
+  .logo { width:96px; height:96px; background:url(logo.png) center/contain no-repeat; animation:resp 2.4s ease-in-out infinite; }
+  h1 { margin:0; font:700 30px/1 system-ui, "Segoe UI", sans-serif; letter-spacing:.01em; }
+  .barra { width:240px; height:4px; border-radius:4px; background:rgba(255,255,255,.08); overflow:hidden; }
+  .barra i { display:block; height:100%; width:40%; border-radius:4px; background:linear-gradient(90deg, var(--blue), var(--mint)); animation:corre 1.3s ease-in-out infinite; }
+  .st { color:var(--muted); font-size:13px; min-height:20px; text-align:center; max-width:420px; }
+  @keyframes corre { 0% { transform:translateX(-110%); } 100% { transform:translateX(260%); } }
+  @keyframes resp { 0%, 100% { transform:scale(1); opacity:.95; } 50% { transform:scale(1.04); opacity:1; } }
+  @media (prefers-reduced-motion: reduce) { .logo, .barra i { animation:none; } }
+</style>
+</head>
+<body>
+<main><div class="box">
+  <div class="logo"></div>
+  <h1>Voxel Cut</h1>
+  <div class="barra"><i></i></div>
+  <div class="st" id="st">Abrindo…</div>
+</div></main>
+<script>
+  // espera o programa ligar e entra nele (o endereço vem na URL: abrindo.html?u=http://localhost:8770/)
+  const alvo = new URLSearchParams(location.search).get("u") || "http://localhost:8770/";
+  const t0 = Date.now();
+  const frases = [[0, "Abrindo…"], [4000, "Ligando o motor de corte…"], [12000, "Quase lá…"], [45000, "Está demorando mais que o normal. Se não abrir, feche esta janela e abra o Voxel Cut de novo."]];
+  function tenta() {
+    const dt = Date.now() - t0;
+    document.getElementById("st").textContent = frases.filter(([t]) => dt >= t).pop()[1];
+    const img = new Image();
+    img.onload = () => location.replace(alvo);
+    img.onerror = () => setTimeout(tenta, 350);
+    img.src = alvo + "logo.png?" + Date.now();
+  }
+  tenta();
+</script>
+</body>
+</html>

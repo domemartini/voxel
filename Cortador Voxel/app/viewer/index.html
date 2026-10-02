@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voxel Cut</title>
+<link rel="icon" href="/icon.png">
+<style>
+  /* Layout "Foco": o 3D ocupa a tela; ferramentas, opções e painéis flutuam em vidro por cima */
+  :root {
+    --bg:#0B0E14; --glass:rgba(15,19,28,.78); --glass2:rgba(22,27,39,.9); --edge:rgba(255,255,255,.08); --edge2:rgba(255,255,255,.14);
+    --text:#e9edf4; --muted:#93a0b6; --dim:#667189; --field:rgba(8,11,17,.7);
+    --blue:#3B82F6; --mint:#10B981; --ok:#34d399; --warn:#fbbf24; --danger:#f87171;
+    --ui:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; --display:"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:13px/1.45 var(--ui); overflow:hidden; }
+  [hidden] { display:none !important; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  button:disabled { opacity:.4; cursor:default; }
+  :focus-visible { outline:2px solid var(--mint); outline-offset:2px; }
+  .ic { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  .ic.s { width:15px; height:15px; }
+  .glass { background:var(--glass); backdrop-filter:blur(16px) saturate(1.2); -webkit-backdrop-filter:blur(16px) saturate(1.2); border:1px solid var(--edge); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+
+  #view { position:fixed; inset:0; background:radial-gradient(ellipse at 50% 38%, #1a2640 0%, #0B0E14 70%); }
+  #view canvas { display:block; }
+  .fl { position:absolute; z-index:5; }
+
+  /* topo */
+  #tl { left:14px; top:14px; display:flex; align-items:center; gap:10px; padding:6px 14px 6px 6px; max-width:360px; }
+  #tl .back { display:grid; place-items:center; width:30px; height:30px; border-radius:9px; color:var(--muted); text-decoration:none; }
+  #tl .back:hover { background:rgba(255,255,255,.06); color:var(--text); }
+  #tl .logo { width:24px; height:24px; background:url(/logo.png) center/contain no-repeat; flex:none; }
+  #tl .nm { min-width:0; } #projname { font:600 14px var(--display); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+  #modelname { color:var(--muted); font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+  #views { left:50%; top:14px; transform:translateX(-50%); display:flex; align-items:center; gap:2px; padding:4px; }
+  #views button { background:none; border:0; color:var(--muted); padding:6px 14px; border-radius:9px; }
+  #views button:hover:not(.on) { color:var(--text); }
+  #views button.on { background:rgba(59,130,246,.9); color:#fff; }
+  #views .vsep { width:1px; height:20px; background:var(--edge2); margin:0 4px; }
+  #showPtsWrap { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; padding:0 8px; cursor:pointer; }
+  #explodeWrap { display:none; align-items:center; gap:6px; color:var(--muted); font-size:12px; padding:0 8px; }
+  #explodeWrap input { width:100px; }
+  #tr { right:14px; top:14px; display:flex; gap:8px; align-items:center; }
+  .ib { width:38px; height:38px; display:grid; place-items:center; color:var(--muted); border-radius:12px; }
+  .ib:hover { color:var(--text); }
+  .go { display:flex; align-items:center; gap:8px; font-weight:600; color:#fff; border:0; border-radius:12px; padding:10px 16px; background:linear-gradient(135deg,var(--blue),var(--mint)); box-shadow:0 6px 20px rgba(16,185,129,.25); }
+  .go:hover { filter:brightness(1.08); }
+  #busy { left:50%; top:66px; transform:translateX(-50%); padding:8px 16px; border-radius:22px; display:none; font-weight:500; border-color:rgba(59,130,246,.45); }
+
+  /* ferramentas */
+  #step2 { left:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; padding:6px; gap:3px; }
+  #step2 .sep { height:1px; background:var(--edge); margin:4px 6px; }
+  .tool { width:40px; height:40px; display:grid; place-items:center; color:#c4cddc; border-radius:10px; background:none; border:0; position:relative; }
+  .tool:hover { background:rgba(255,255,255,.06); }
+  .tool.on { background:rgba(59,130,246,.22); color:#cfe0ff; box-shadow:inset 0 0 0 1px rgba(59,130,246,.55); }
+  .tool.popon { box-shadow:inset 0 0 0 1px rgba(16,185,129,.6); color:#bff5df; }
+
+  /* cartão de opções da ferramenta */
+  #pop { left:76px; width:292px; padding:12px 14px 14px; max-height:calc(100% - 180px); overflow-y:auto; }
+  #popH { display:flex; align-items:center; gap:8px; font-weight:600; font-size:13.5px; }
+  #popH kbd { margin-left:auto; }
+  #popD { color:var(--muted); font-size:12px; margin:3px 0 8px; }
+  #pop .blk:empty { display:none; }
+  label.f { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:7px 0; white-space:nowrap; color:#cbd3e1; font-size:12.5px; }
+  label.f input[type=number], select { width:76px; background:var(--field); border:1px solid var(--edge2); color:var(--text); border-radius:8px; padding:5px 8px; font:inherit; }
+  select { width:auto; max-width:140px; }
+  input[type=range] { accent-color:var(--mint); width:120px; }
+  input[type=checkbox] { accent-color:var(--blue); width:16px; height:16px; }
+  .small { color:var(--muted); font-size:11.5px; line-height:1.45; }
+  kbd { background:rgba(255,255,255,.06); border:1px solid var(--edge2); border-radius:5px; padding:0 5px; font:11px var(--ui); color:#cbd3e1; }
+  .btn { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; background:rgba(255,255,255,.06); border:1px solid var(--edge2); border-radius:10px; padding:8px 10px; margin-top:8px; }
+  .btn:hover { background:rgba(255,255,255,.1); }
+  .btn.pri { background:linear-gradient(135deg,var(--blue),var(--mint)); border:0; color:#fff; font-weight:600; }
+  .btn.ghost { background:transparent; border-color:transparent; color:var(--muted); }
+  .btn.ghost:hover { color:var(--text); background:rgba(255,255,255,.05); }
+  .row { display:flex; gap:6px; flex-wrap:wrap; } .row .btn { flex:1; width:auto; }
+  .seg { display:flex; background:var(--field); border:1px solid var(--edge2); border-radius:10px; padding:3px; gap:2px; }
+  .seg button { flex:1; background:none; border:0; color:var(--muted); padding:5px 8px; border-radius:7px; font-size:12px; }
+  .seg button.on { background:rgba(59,130,246,.85); color:#fff; }
+  #jType { flex-wrap:wrap; } #jType button { flex:1 0 22%; padding:5px 4px; }   /* 7 tipos: duas linhas */
+  .est { width:100%; border-collapse:collapse; font-size:11.5px; margin:4px 0; } .est td { padding:3px 4px; border-bottom:1px solid var(--edge); color:#cbd3e1; }
+  .est td.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--muted); } .est tr.tot td { color:#fff; font-weight:600; border-bottom:0; }
+  .est .sup-muito { color:var(--warn); }
+  #slicerRow { margin:6px 0 2px; } #slicerTxt { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #side { overflow-x:hidden; } #side .row .btn { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* tutorial */
+  #tour { position:fixed; inset:0; z-index:60; pointer-events:none; }
+  #tour .hole { position:fixed; border-radius:12px; box-shadow:0 0 0 9999px rgba(5,8,14,.62); border:2px solid var(--mint); transition:all .25s; }
+  #tour .tip { position:fixed; width:320px; background:var(--glass2); border:1px solid var(--edge2); border-radius:14px; padding:14px 16px; box-shadow:0 14px 40px rgba(0,0,0,.55); pointer-events:auto; backdrop-filter:blur(14px); }
+  #tour .tip h4 { margin:0 0 6px; font:600 14px var(--display); } #tour .tip p { margin:0; color:#cbd3e1; font-size:12.5px; line-height:1.5; }
+  #tour .tip .nav { display:flex; align-items:center; gap:8px; margin-top:12px; } #tour .tip .nav .dots { flex:1; color:var(--muted); font-size:11.5px; }
+  #tour .tip button { border:1px solid var(--edge2); background:rgba(255,255,255,.06); border-radius:9px; padding:6px 12px; }
+  #tour .tip button.pri { background:linear-gradient(135deg,var(--blue),var(--mint)); border:0; color:#fff; font-weight:600; }
+  .x { background:none; border:0; color:var(--muted); padding:3px 6px; border-radius:7px; display:inline-grid; place-items:center; }
+  .x:hover { background:rgba(255,255,255,.07); color:var(--text); }
+  #planes .pl { display:flex; align-items:center; gap:6px; margin:4px 0; font-size:12px; } #planes input[type=range] { flex:1; }
+  #strokes { font-size:12px; color:var(--muted); margin-top:8px; } #strokes:empty { display:none; }
+  #smartRes .pc { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.04); margin:4px 0; font-size:12px; }
+  #smartRes .pc .sw { width:12px; height:12px; border-radius:4px; flex:none; } #smartRes .pc .nm { flex:1; font-weight:600; }
+  #smartRes .pc .st { color:var(--muted); font-size:11px; text-align:right; } #smartRes .warn { color:var(--warn); }
+
+  /* painéis da direita */
+  #side { right:14px; top:66px; bottom:78px; width:300px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; padding-bottom:4px; scrollbar-width:thin; }
+  .card { padding:12px; flex:none; }
+  .card > .hd { display:flex; align-items:center; gap:8px; font-weight:600; font-size:13px; cursor:pointer; user-select:none; }
+  .card > .hd .chev { margin-left:auto; color:var(--muted); transition:transform .15s; }
+  .card > .hd .st { width:8px; height:8px; border-radius:50%; background:var(--dim); flex:none; }
+  .card.done > .hd .st { background:var(--ok); box-shadow:0 0 8px rgba(52,211,153,.6); }
+  .card.closed > .hd .chev { transform:rotate(-90deg); } .card.closed > .bd { display:none; }
+  .card > .bd { margin-top:10px; }
+  .sub { font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:12px 0 6px; font-weight:600; }
+  .sub:first-child { margin-top:0; }
+  .grp { --c:#888; display:grid; grid-template-columns:12px 1fr auto auto auto auto; align-items:center; gap:6px; padding:5px 6px; border-radius:9px; cursor:pointer; border:1px solid transparent; }
+  .grp:hover { background:rgba(255,255,255,.04); }
+  .grp.active { background:color-mix(in srgb, var(--c) 14%, transparent); border-color:color-mix(in srgb, var(--c) 55%, transparent); }
+  .grp .order { display:none; }
+  .grp input[type=color] { width:12px; height:12px; border:none; border-radius:4px; background:none; padding:0; cursor:pointer; }
+  .grp input[type=color]::-webkit-color-swatch-wrapper { padding:0; } .grp input[type=color]::-webkit-color-swatch { border:none; border-radius:4px; }
+  .grp input[type=text] { min-width:0; background:transparent; border:1px solid transparent; color:var(--text); border-radius:6px; padding:3px 5px; font:inherit; }
+  .grp input[type=text]:hover, .grp input[type=text]:focus { border-color:var(--edge2); background:var(--field); outline:none; }
+  .grp .n { color:var(--muted); font-size:11px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .grp .n.zero { color:var(--warn); }
+  .grp .x { opacity:0; } .grp:hover .x, .grp.active .x, .grp .x.eye.off { opacity:1; } .grp .x.eye { opacity:.6; }
+  .note { color:var(--muted); font-size:11.5px; margin-top:8px; line-height:1.45; }
+  #result { margin-top:8px; } #result:empty { display:none; } #result .it { font-size:12px; color:#cbd3e1; margin:2px 0; }
+  #jointSvg { width:100%; background:var(--field); border:1px solid var(--edge2); border-radius:10px; display:block; }
+  #previewInfo .ok { color:var(--ok); font-weight:600; margin:10px 0 4px; }
+  label.fmt { flex:1; display:flex; align-items:center; gap:6px; background:var(--field); border:1px solid var(--edge2); border-radius:9px; padding:7px 9px; cursor:pointer; font-size:12px; }
+  label.fmt:has(input:checked) { border-color:rgba(59,130,246,.7); background:rgba(59,130,246,.12); }
+  #files .done { color:var(--ok); font-weight:600; margin:10px 0 6px; }
+  #files .file { display:flex; align-items:center; gap:8px; background:var(--field); border:1px solid var(--edge); padding:6px 9px; border-radius:8px; margin:4px 0; font-size:12px; }
+  #files .fn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } #files .fs { color:var(--muted); font-size:11px; white-space:nowrap; }
+  details { margin-top:8px; } details > summary { cursor:pointer; color:var(--muted); font-size:12px; list-style:none; user-select:none; }
+  details > summary::before { content:"▸ "; } details[open] > summary::before { content:"▾ "; } details > summary:hover { color:var(--text); }
+  #log { background:rgba(0,0,0,.35); border:1px solid var(--edge); border-radius:8px; padding:8px; font:11px/1.35 ui-monospace,Consolas,monospace; height:170px; overflow:auto; white-space:pre-wrap; color:#8e9ab0; }
+
+  /* guia de etapas e dica */
+  #flow { left:50%; bottom:14px; transform:translateX(-50%); display:flex; align-items:center; gap:4px; padding:6px 6px 6px 14px; }
+  .fst { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:12.5px; padding:4px 6px; }
+  .fst i { width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font:600 11px var(--ui); font-style:normal; border:1px solid var(--edge2); }
+  .fst.done i { background:var(--mint); border-color:var(--mint); color:#032b1d; } .fst.now { color:#fff; } .fst.now i { border-color:var(--blue); color:#cfe0ff; background:rgba(59,130,246,.25); }
+  .farrow { color:#3b4659; }
+  #flowNext { display:flex; align-items:center; gap:7px; font-weight:600; color:#fff; background:var(--blue); border:0; border-radius:10px; padding:8px 14px; margin-left:8px; }
+  #flowNext:hover { filter:brightness(1.1); }
+  #hint { left:14px; bottom:18px; max-width:min(360px, 28vw); color:var(--muted); font-size:12px; line-height:1.45; pointer-events:none; }
+  #hint b { color:var(--text); font-weight:600; }
+
+  .dotmenu { position:absolute; z-index:8; background:var(--glass2); backdrop-filter:blur(14px); border:1px solid var(--edge2); border-radius:12px; padding:8px; width:210px; box-shadow:0 12px 30px rgba(0,0,0,.5); }
+  .dotmenu .dm-t { font-size:12px; color:#cbd3e1; margin:2px 4px 6px; }
+  .dotmenu button { display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:transparent; border:none; padding:6px 8px; border-radius:7px; font-size:12.5px; }
+  .dotmenu button:hover { background:rgba(255,255,255,.07); }
+  .dotmenu .sw { width:12px; height:12px; border-radius:4px; flex:none; }
+  .dotmenu .dm-del { color:#fca5a5; border-top:1px solid var(--edge); border-radius:0 0 7px 7px; margin-top:4px; }
+  .locked { opacity:.45; pointer-events:none; }
+  #outRow { display:flex; align-items:center; gap:6px; margin:8px 0 0; font-size:11.5px; color:var(--muted); } #outRow span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } #outRow b { color:#cbd3e1; font-weight:500; }
+  .cut { margin:6px 0 8px; } .cutsel { display:flex; gap:6px; margin-top:3px; } .cutsel select { flex:1; min-width:0; max-width:none; padding:4px 6px; font-size:11.5px; }
+  .plrow { display:flex; align-items:center; gap:7px; padding:5px 6px; border-radius:8px; background:rgba(255,255,255,.04); margin:4px 0; font-size:12.5px; }
+  .plrow .small { flex:1; } .plrow .sw, .plsel .sw { width:11px; height:11px; border-radius:3px; flex:none; display:inline-block; }
+  .plsel { display:flex; align-items:center; gap:7px; font-size:13px; margin:2px 0 2px; } .warn { color:var(--warn); }
+  @media (max-width: 1100px) { #side { width:270px; } #hint { display:none; } }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/lib/three.module.js", "three/addons/": "/lib/addons/" } }
+</script>
+</head>
+<body>
+<div id="view">
+  <!-- topo -->
+  <div class="fl glass" id="tl">
+    <a class="back" href="/" title="voltar para os projetos"><svg class="ic s"><use href="#i-left"/></svg></a>
+    <span class="logo"></span>
+    <span class="nm"><span id="projname">Voxel Cut</span><span id="modelname"></span></span>
+  </div>
+  <div class="fl glass" id="views">
+    <button id="showMarks" class="on">Marcações</button><button id="showResult">Resultado</button><button id="showPieces">Peças prontas</button><button id="showPlates" title="as peças arrumadas nos pratos da impressora">Pratos</button>
+    <span class="vsep"></span>
+    <label id="showPtsWrap" title="mostrar os pontos e traços"><input type="checkbox" id="showPts" checked> pontos</label>
+    <label id="explodeWrap">afastar <input type="range" id="explode" min="0" max="2" step="0.05" value="0.6"></label>
+  </div>
+  <div class="fl" id="tr">
+    <button class="ib glass" id="undo" title="desfazer (Ctrl+Z)" aria-label="desfazer"><svg class="ic s"><use href="#i-undo"/></svg></button>
+    <button class="ib glass" id="frame" title="enquadrar o modelo" aria-label="enquadrar"><svg class="ic s"><use href="#i-frame"/></svg></button>
+    <button class="ib glass" id="tourBtn" title="tutorial: como usar" aria-label="tutorial"><svg class="ic s"><use href="#i-help"/></svg></button>
+    <button class="go" id="goExport"><svg class="ic s"><use href="#i-down"/></svg>Gerar arquivos</button>
+  </div>
+  <div class="fl glass" id="busy"></div>
+
+  <!-- ferramentas -->
+  <div class="fl glass" id="step2">
+    <button class="tool vtool" data-t="nav" data-k="nav" title="Navegar (N ou Espaço)" aria-label="Navegar"><svg class="ic"><use href="#i-hand"/></svg></button>
+    <div class="sep"></div>
+    <button class="tool" id="toolPoint" data-k="point" title="Pontos (1)" aria-label="Pontos"><svg class="ic"><use href="#i-dot"/></svg></button>
+    <button class="tool" id="toolPaint" data-k="paint" title="Marcar área (2)" aria-label="Marcar área"><svg class="ic"><use href="#i-brush"/></svg></button>
+    <button class="tool" id="toolCut" data-k="cut" title="Pincel de corte (3)" aria-label="Pincel de corte"><svg class="ic"><use href="#i-scissors"/></svg></button>
+    <button class="tool" id="toolPlane" data-k="plane" title="Plano (4)" aria-label="Plano"><svg class="ic"><use href="#i-plane"/></svg></button>
+    <div class="sep"></div>
+    <button class="tool" id="toolManual" data-k="manual" title="Pintar à mão (5)" aria-label="Pintar à mão"><svg class="ic"><use href="#i-paint"/></svg></button>
+    <button class="tool" id="toolSponge" data-k="sponge" title="Esponja (6)" aria-label="Esponja"><svg class="ic"><use href="#i-smooth"/></svg></button>
+    <button class="tool" id="toolStraight" data-k="straight" title="Corte reto" aria-label="Corte reto"><svg class="ic"><use href="#i-ruler"/></svg></button>
+    <div class="sep"></div>
+    <button class="tool" id="toolDel" data-k="del" title="Apagar (7)" aria-label="Apagar"><svg class="ic"><use href="#i-eraser"/></svg></button>
+    <button class="tool" id="toolSmart" data-k="smart" title="Separador inteligente" aria-label="Separador inteligente"><svg class="ic"><use href="#i-spark"/></svg></button>
+  </div>
+
+  <!-- opções da ferramenta ativa -->
+  <div class="fl glass" id="pop">
+    <div id="popH"></div>
+    <div id="popD"></div>
+    <div class="blk" id="opts2">
+      <label class="f" data-tools="point paint">Tamanho dos pontos <input type="range" id="brush" min="0.5" max="3" step="0.25" value="1.25"></label>
+      <label class="f" data-tools="cut">Tamanho do pincel <input type="range" id="brushW" min="0.05" max="4" step="0.05" value="1"></label>
+      <div id="planes" data-tools="plane"></div>
+      <div id="mesaBox" data-tools="plane">
+        <div class="sub" style="margin-top:12px">Dividir pra caber na mesa</div>
+        <label class="f">Impressora <select id="mesaSel"></select></label>
+        <div class="row" id="mesaCustom" hidden><input type="number" id="mesaW" placeholder="larg." min="50" style="width:31%"><input type="number" id="mesaD" placeholder="prof." min="50" style="width:31%"><input type="number" id="mesaH" placeholder="alt." min="50" style="width:31%"></div>
+        <button class="btn" id="mesaRun"><svg class="ic s"><use href="#i-plane"/></svg>Dividir pela mesa</button>
+        <div class="small" style="margin-top:6px">Corta o modelo em partes que cabem na mesa, com cortes retos e rabo de andorinha (ou pino, se não couber).</div>
+      </div>
+      <div data-tools="cut"><div id="strokes"></div></div>
+    </div>
+    <div class="blk" data-tools="del">
+      <label class="f">Tamanho do pincel <input type="range" id="brushW3" min="0.05" max="4" step="0.05" value="1"></label>
+      <label class="f"><span>Pedaço inteiro no clique</span> <input type="checkbox" id="delWhole"></label>
+      <button class="btn" id="delAuto"><svg class="ic s"><use href="#i-spark"/></svg>Marcar pedaços soltos</button>
+      <div class="row" style="margin-top:6px"><span class="small" id="delInfo" style="flex:1;align-self:center"></span><button class="btn ghost" id="delClear" style="flex:none;width:auto;margin:0">Desmarcar tudo</button></div>
+      <div class="small" style="margin-top:6px"><kbd>Shift</kbd> + pincel desmarca. O que fica no xadrez não entra em nenhuma peça e o buraco é fechado.</div>
+    </div>
+    <div class="blk" data-tools="manual">
+      <label class="f">Tamanho do pincel <input type="range" id="brushW2" min="0.05" max="4" step="0.05" value="1"></label>
+      <div class="small">Pinta a peça selecionada na lista. <kbd>[</kbd> <kbd>]</kbd> mudam o tamanho. O que você pinta fica travado: o Separar e a esponja respeitam.</div>
+      <div class="row" style="margin-top:6px"><span class="small" id="paintedInfo" style="flex:1;align-self:center"></span><button class="btn ghost" id="paintClear" style="flex:none;width:auto;margin:0">Soltar a trava</button></div>
+    </div>
+    <div class="blk" id="spongeBox" data-tools="sponge">
+      <label class="f">Força <span><input type="range" id="spongeStr" min="0.5" max="8" step="0.5" value="2.5"> <span id="spongeVal" class="small">2.5</span> mm</span></label>
+      <div class="row"><button class="btn" id="smoothAll">Alisar todas</button><button class="btn ghost" id="undoSmooth">Desfazer ajuste</button></div>
+    </div>
+    <div class="blk" id="straightBox" data-pop="straight" hidden>
+      <button class="btn" id="straightAll"><svg class="ic s"><use href="#i-ruler"/></svg>Deixar os cortes retos</button>
+      <div class="small" style="margin-top:6px">Só as costuras que já são quase planas viram corte reto. Para uma costura só, use o botão <b>reto</b> dela no cartão Separação.</div>
+    </div>
+    <div class="blk" data-pop="smart" hidden>
+      <div id="objBox" hidden>
+        <div class="small" id="objTxt" style="margin-bottom:6px"></div>
+        <button class="btn pri" id="objRun"><svg class="ic s"><use href="#i-split"/></svg>Cada objeto vira uma peça</button>
+        <div class="small" style="margin:6px 0 12px">Usa as peças como o designer separou. Dá pra juntar com os pontos ou cortar mais depois.</div>
+      </div>
+      <div id="corBox" hidden>
+        <div class="small" id="corTxt" style="margin-bottom:6px"></div>
+        <div class="seg" id="corModo"><button data-m="regioes" class="on">Cada região</button><button data-m="cor">Uma por cor</button></div>
+        <button class="btn pri" id="corRun"><svg class="ic s"><use href="#i-paint"/></svg>Separar por cor</button>
+        <div class="small" style="margin:6px 0 12px">Cada cor vira peça com encaixe: imprime sem AMS e sem purga. Ilhas bem pequenas vão pra cor vizinha.</div>
+      </div>
+      <div class="seg" id="smartLevel"><button data-l="poucas">Poucas peças</button><button data-l="medio" class="on">Médio</button><button data-l="muitas">Muitas</button></div>
+      <button class="btn pri" id="smartRun"><svg class="ic s"><use href="#i-spark"/></svg>Sugerir peças</button>
+      <div id="smartRes"></div>
+    </div>
+  </div>
+
+  <!-- painéis -->
+  <div class="fl" id="side">
+    <div class="card glass" id="step1">
+      <div class="hd"><span class="st"></span>Peças<svg class="ic s chev"><use href="#i-chev"/></svg></div>
+      <div class="bd">
+        <div id="groups"></div>
+        <div class="row" style="margin-top:6px"><button class="btn" id="addGroup" style="margin:0"><svg class="ic s"><use href="#i-plus"/></svg>Nova peça</button><button class="btn ghost" id="clearG" style="margin:0">Limpar pontos</button></div>
+        <div class="note">A última da lista fica com o que sobrar (ex.: Base). Os pinos vão da peça de cima para a de baixo.</div>
+      </div>
+    </div>
+    <div class="card glass closed" id="step3">
+      <div class="hd"><span class="st"></span>Separação<svg class="ic s chev"><use href="#i-chev"/></svg></div>
+      <div class="bd">
+        <button class="btn pri" id="segment" style="margin-top:0"><svg class="ic s"><use href="#i-split"/></svg>Separar peças</button>
+        <div id="result"></div>
+        <details>
+          <summary>Opções avançadas</summary>
+          <label class="f"><span>Forçar o fundo em <b id="anchorName">…</b></span> <input type="checkbox" id="anchor"></label>
+          <label class="f">Suavização automática (mm) <input type="number" id="autoSmooth" value="1" step="0.5" min="0"></label>
+        </details>
+      </div>
+    </div>
+    <div class="card glass closed" id="stepJ">
+      <div class="hd"><span class="st"></span>Encaixe<svg class="ic s chev"><use href="#i-chev"/></svg></div>
+      <div class="bd">
+        <svg id="jointSvg" viewBox="0 0 300 150"></svg>
+        <div id="jointOpts">
+          <label class="f"><span>Corte reto (assenta na mesa)</span> <input type="checkbox" id="jFlat" checked></label>
+          <label class="f"><span>Encaixe no formato do corte <span class="small">(ressalto + rebaixo)</span></span> <input type="checkbox" id="jStep" checked></label>
+          <label class="f" data-s="1">Altura do encaixe (mm) <input type="number" id="jStepD" value="2" step="0.5" min="0.5"></label>
+          <label class="f" data-s="1">Arredondamento (mm) <input type="number" id="jRound" value="1.5" step="0.5" min="0"></label>
+          <div data-s="1" id="jSides"></div>
+          <div class="sub">Pino</div>
+          <div class="seg" id="jType"><button data-t="none">Nenhum</button><button data-t="round" class="on">Redondo</button><button data-t="square">Quadr.</button><button data-t="hex">Sextav.</button><button data-t="cone">Cônico</button><button data-t="center">Central</button><button data-t="magnet">Ímã</button></div>
+          <div data-p="1">
+            <label class="f">Quantidade <select id="jCount"><option value="auto">automático</option><option>1</option><option>2</option><option>3</option></select></label>
+            <label class="f" data-np="1">Diâmetro (mm) <input type="number" id="jD" value="" placeholder="auto" step="0.5" min="1"></label>
+            <label class="f" data-np="1">Profundidade do pino (mm) <input type="number" id="jL" value="4" step="0.5" min="1"></label>
+            <label class="f" data-np="1"><span>Pino solto <span class="small">(imprime à parte)</span></span> <input type="checkbox" id="jLoose"></label>
+            <label class="f" data-mg="1">Tamanho do ímã <select id="jMag"><option value="5x2">5 × 2 mm</option><option value="6x2" selected>6 × 2 mm</option><option value="6x3">6 × 3 mm</option><option value="8x2">8 × 2 mm</option><option value="8x3">8 × 3 mm</option><option value="10x2">10 × 2 mm</option><option value="10x3">10 × 3 mm</option><option value="12x3">12 × 3 mm</option></select></label>
+            <div class="small" data-mg="1">Ímã redondo de neodímio (diâmetro × altura). Abre o furo nas duas peças: cole um ímã em cada, conferindo a polaridade antes. Bom pra peça que destaca.</div>
+          </div>
+          <label class="f" style="margin-top:10px"><span>Número do corte gravado <span class="small">(dentro do encaixe)</span></span> <input type="checkbox" id="jLabel" checked></label>
+          <div class="sub">Ajuste</div>
+          <label class="f">Folga (mm) <input type="number" id="jClear" value="0.15" step="0.05" min="0"></label>
+          <label class="f">Parede na borda (mm) <input type="number" id="jWall" value="1.2" step="0.1" min="0.3"></label>
+          <div class="row"><button class="btn" id="calib" type="button" style="margin-top:4px"><svg class="ic s"><use href="#i-ruler"/></svg>Teste de folga</button><button class="btn ghost" id="jPadrao" type="button" style="margin-top:4px" title="usar estes ajustes nos projetos novos">Salvar padrão</button></div>
+        </div>
+        <button class="btn" id="preview"><svg class="ic s"><use href="#i-eye"/></svg>Visualizar encaixes</button>
+        <div id="previewInfo"></div>
+      </div>
+    </div>
+    <div class="card glass closed" id="stepP">
+      <div class="hd"><span class="st"></span>Pratos<svg class="ic s chev"><use href="#i-chev"/></svg></div>
+      <div class="bd" id="platesBd"><div class="small">Clique em <b>Pratos</b> no topo para ver as peças arrumadas nos pratos da impressora.</div></div>
+    </div>
+    <div class="card glass closed" id="step5">
+      <div class="hd"><span class="st"></span>Exportar<svg class="ic s chev"><use href="#i-chev"/></svg></div>
+      <div class="bd">
+        <div class="row"><label class="fmt"><input type="checkbox" id="fmtStl" checked> STL <span class="small">cada peça</span></label><label class="fmt"><input type="checkbox" id="fmt3mf" checked> 3MF <span class="small">pratos</span></label></div>
+        <div class="small" style="margin-top:6px">O 3MF traz as peças arrumadas nos pratos (veja em Pratos, no topo), pronto pro Bambu Studio e Orca. O STL abre em qualquer fatiador.</div>
+        <div id="outRow"><span>Salvar em <b id="outPath"></b></span><button class="x" id="outMudar" type="button" title="escolher outra pasta pros arquivos deste projeto">mudar</button></div>
+        <button class="btn pri" id="finalize"><svg class="ic s"><use href="#i-down"/></svg>Gerar arquivos</button>
+        <details><summary>Mais opções</summary><label class="f">Corte menor que isso só cola (mm²) <input type="number" id="minarea" value="8" step="1" min="0"></label></details>
+        <div id="files"></div>
+      </div>
+    </div>
+    <div class="card glass closed" id="stepLog">
+      <div class="hd"><span class="st" style="visibility:hidden"></span>Registro técnico<svg class="ic s chev"><use href="#i-chev"/></svg></div>
+      <div class="bd"><div id="log"></div></div>
+    </div>
+  </div>
+
+  <!-- etapas + dica -->
+  <div class="fl glass" id="flow">
+    <span class="fst" id="fl1"><i>1</i>Indicar</span><span class="farrow">›</span>
+    <span class="fst" id="fl2"><i>2</i>Separar</span><span class="farrow">›</span>
+    <span class="fst" id="fl3"><i>3</i>Encaixar</span><span class="farrow">›</span>
+    <span class="fst" id="fl4"><i>4</i>Exportar</span>
+    <button id="flowNext"><span id="flowTxt">Separar peças</span><svg class="ic s"><use href="#i-right"/></svg></button>
+  </div>
+  <div class="fl" id="hint"></div>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
+  <symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="12" cy="12" r="8"/></symbol>
+  <symbol id="i-brush" viewBox="0 0 24 24"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></symbol>
+  <symbol id="i-plane" viewBox="0 0 24 24"><path d="M3 15 9 7h12l-6 8z"/><path d="M3 15v2h12l6-8" opacity=".5"/></symbol>
+  <symbol id="i-paint" viewBox="0 0 24 24"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5M2 13h15M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></symbol>
+  <symbol id="i-smooth" viewBox="0 0 24 24"><path d="M2 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0"/><path d="M2 18c2-3 4-3 6 0s4 3 6 0 4-3 6 0" opacity=".5"/><path d="M2 6h20" opacity=".5"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2"/></symbol>
+  <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7M5 11l9 9"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M9.94 10.06 4 12l5.94 1.94L12 20l2.06-6.06L20 12l-5.94-1.94L12 4z"/><path d="M19 2v4M17 4h4"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M10.7 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.1 3M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7c1.9 0 3.6-.6 5-1.5M2 2l20 20"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+  <symbol id="i-split" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 13h7v7h-7z"/><path d="M15 4h5v5M4 15v5h5" opacity=".6"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-frame" viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2.2-2.4 3.8M12 17h.01"/></symbol>
+  <symbol id="i-calc" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M8 7h8M8 11h6"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+</svg>
+<script type="module" src="/app.js"></script>
+<script type="module" src="/ajuda.js"></script>
+<script type="module" src="/tutorial.js"></script>
+</body>
+</html>

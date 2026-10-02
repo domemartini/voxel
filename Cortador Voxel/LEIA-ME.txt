@@ -1,0 +1,18 @@
+VOXEL CUT
+==============
+INSTALAR EM OUTRO PC: descompacte a pasta onde quiser (ex.: Documentos) e rode instalar.bat
+  (instala o Python se precisar, as bibliotecas e cria os atalhos).
+
+Abrir: atalho "Voxel Cut" na área de trabalho (ou no menu Iniciar).
+Abre uma janela própria (Edge em modo app). Fechou a janela, o programa desliga sozinho em ~1,5 min.
+
+Pastas:
+  app\          o programa (server.py, engine\ = cálculos, viewer\ = telas)
+  projetos\     um projeto por modelo aberto (pode apagar pela tela inicial)
+  Arquivos gerados\   saída dos modelos que foram ARRASTADOS pra janela
+Modelos abertos pelo botão "Abrir" salvam as peças ao lado do arquivo original,
+na pasta "<nome> - partes".
+
+Precisa de: Python 3.12 com numpy, scipy, shapely, manifold3d, fast-simplification, scikit-image
+(não precisa mais do Blender).
+Se algo der errado: app\servidor.log

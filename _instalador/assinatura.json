@@ -1,0 +1,6 @@
+{
+ "ativo": false,
+ "certificado": "nome que aparece no certificado (ex.: Domenico ...)",
+ "signtool": "",
+ "timestamp": "http://time.certum.pl"
+}

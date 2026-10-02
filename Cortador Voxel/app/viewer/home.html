@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voxel Cut</title>
+<link rel="icon" href="/icon.png">
+<style>
+  :root { --bg:#0B0E14; --panel:#121722; --card:#161c28; --line:#252d3c; --text:#eceef2; --muted:#8e97a8; --accent:#3B82F6; --accent2:#10B981; --ok:#34d399; --danger:#f87171; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font:14px/1.45 system-ui, "Segoe UI", sans-serif; }
+  body { background:radial-gradient(ellipse at 50% -10%, #16223a 0%, #0B0E14 60%) fixed; }
+  header { display:flex; align-items:center; gap:12px; padding:22px 36px; }
+  .logo { width:46px; height:46px; background:url(/logo.png) center/contain no-repeat; font-size:0; color:transparent; filter:drop-shadow(0 4px 14px rgba(16,185,129,.25)); }
+  header h1 { margin:0; font-size:20px; } header .s { color:var(--muted); font-size:12.5px; }
+  header .sp { flex:1; }
+  main { padding:6px 36px 40px; max-width:1300px; margin:0 auto; }
+  button { background:#2a303c; color:var(--text); border:1px solid #363e4d; border-radius:9px; padding:8px 14px; cursor:pointer; font:inherit; }
+  button:hover { background:#333a48; }
+  button.primary { background:linear-gradient(135deg,#3B82F6,#10B981); border:none; color:#fff; font-weight:650; padding:10px 18px; box-shadow:0 4px 14px rgba(59,130,246,.25); }
+  button.primary:hover { filter:brightness(1.1); }
+  #drop { border:2px dashed #343c4c; border-radius:16px; padding:34px; text-align:center; background:rgba(31,35,44,.55); transition:.15s; cursor:pointer; }
+  #drop:hover, #drop.over { border-color:var(--accent); background:rgba(59,130,246,.08); }
+  #drop .big { font-size:36px; } #drop .t { font-size:16px; font-weight:650; margin-top:6px; } #drop .d { color:var(--muted); font-size:13px; margin-top:4px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:30px 0 12px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; cursor:pointer; transition:.15s; position:relative; }
+  .card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  .card .th { height:170px; background:#161920 center/cover no-repeat; display:grid; place-items:center; color:#3a4252; font-size:40px; }
+  .card .b { padding:11px 13px; }
+  .card .n { font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .m { color:var(--muted); font-size:12px; margin-top:2px; }
+  .tags { display:flex; gap:5px; margin-top:7px; flex-wrap:wrap; }
+  .tag { font-size:11px; padding:1px 8px; border-radius:20px; background:#2a303c; color:#c3cad6; }
+  .tag.ok { background:rgba(52,211,153,.15); color:var(--ok); }
+  .card .menu { position:absolute; top:8px; right:8px; display:flex; gap:4px; opacity:0; transition:.15s; }
+  .card:hover .menu { opacity:1; }
+  .card .menu button { padding:4px 9px; font-size:12px; background:rgba(17,19,24,.85); }
+  .card .menu button.del:hover { background:var(--danger); border-color:var(--danger); }
+  .empty { color:var(--muted); padding:30px; text-align:center; border:1px solid var(--line); border-radius:14px; }
+  /* dialog */
+  #dlg { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; place-items:center; z-index:10; backdrop-filter:blur(3px); }
+  #dlg .box { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px; width:420px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  #dlg h3 { margin:0 0 4px; } #dlg .f { color:var(--muted); font-size:12.5px; word-break:break-all; margin-bottom:14px; }
+  label.l { display:block; margin:10px 0 4px; font-size:13px; color:#cfd6e2; }
+  input[type=text], input[type=number] { width:100%; background:#12151b; border:1px solid var(--line); color:var(--text); border-radius:8px; padding:9px 10px; font:inherit; }
+  input:focus { outline:none; border-color:var(--accent); }
+  .hint { color:var(--muted); font-size:11.5px; margin-top:4px; }
+  .acts { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  /* progress */
+  #prog { position:fixed; inset:0; background:rgba(10,12,16,.8); display:none; place-items:center; z-index:20; backdrop-filter:blur(4px); }
+  #prog .box { text-align:center; }
+  .spin { width:46px; height:46px; border-radius:50%; border:4px solid #2c323e; border-top-color:var(--accent); animation:r 0.9s linear infinite; margin:0 auto 16px; }
+  @keyframes r { to { transform:rotate(360deg); } }
+  /* licença */
+  #lic { position:fixed; inset:0; background:radial-gradient(ellipse at 50% -10%, #16223a 0%, #0B0E14 65%); display:none; place-items:center; z-index:30; }
+  #lic .box { width:520px; max-width:calc(100% - 32px); background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  #lic .logo { width:64px; height:64px; margin-bottom:14px; }
+  #lic .pcbox { display:flex; align-items:center; gap:12px; background:#0f141d; border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin:0 0 12px; }
+  #lic .pcbox span { color:var(--muted); font-size:12.5px; flex:1; }
+  #lic .pcbox b { font:700 18px ui-monospace, Consolas, monospace; letter-spacing:.08em; color:#fff; }
+  #lic .pcbox button { padding:6px 10px; font-size:12px; }
+  #lic h3 { margin:0 0 6px; font-size:20px; } #lic p { color:var(--muted); margin:0 0 14px; }
+  #lic textarea { width:100%; height:92px; background:#12151b; border:1px solid var(--line); color:var(--text); border-radius:10px; padding:10px; font:12px ui-monospace,Consolas,monospace; resize:none; word-break:break-all; }
+  #lic textarea:focus { outline:none; border-color:var(--accent); }
+  #lic .msg { min-height:20px; margin-top:8px; font-size:13px; color:var(--danger); }
+  #licChip { font-size:12px; color:var(--muted); padding:5px 11px; border:1px solid var(--line); border-radius:20px; cursor:pointer; }
+  #licChip.warn { color:#fbbf24; border-color:#7a5a12; background:rgba(251,191,36,.08); }
+  #prog .st { font-size:16px; font-weight:600; } #prog .lg { color:var(--muted); font-size:12px; margin-top:6px; max-width:520px; font-family:ui-monospace,Consolas,monospace; }
+  .ic { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex:none; vertical-align:-3px; }
+  .ic.big { width:40px; height:40px; stroke-width:1.4; color:#7fb0ff; }
+  header button { display:inline-flex; align-items:center; gap:8px; }
+  .card .menu button { display:inline-grid; place-items:center; }
+  #saidaRow { display:flex; align-items:center; gap:10px; margin:12px 2px 0; color:var(--muted); font-size:12.5px; }
+  #saidaRow .ic { width:16px; height:16px; flex:none; } #saidaRow span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #saidaRow b { color:var(--text); font-weight:500; }
+  #saidaRow button { padding:5px 12px; font-size:12px; }
+  /* biblioteca: busca, pastas, ordem */
+  #barra { display:flex; align-items:center; gap:10px; margin:30px 0 12px; flex-wrap:wrap; }
+  #barra h2 { margin:0 8px 0 0; }
+  #busca { width:240px; background:#12151b; border:1px solid var(--line); color:var(--text); border-radius:9px; padding:7px 10px; font:inherit; }
+  #busca:focus { outline:none; border-color:var(--accent); }
+  #ordem { background:#12151b; border:1px solid var(--line); color:var(--text); border-radius:9px; padding:7px 8px; font:inherit; }
+  #pastas { display:flex; gap:6px; flex-wrap:wrap; flex:1; }
+  .chip { font-size:12.5px; padding:5px 12px; border-radius:20px; background:#1b2130; border:1px solid var(--line); color:#c3cad6; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .chip:hover { border-color:#4b5b82; } .chip.on { background:rgba(59,130,246,.18); border-color:var(--accent); color:#fff; }
+  .chip .q { color:var(--muted); font-size:11px; }
+  .tag.pasta { background:rgba(59,130,246,.14); color:#9cc1ff; }
+  .pmenu { position:absolute; z-index:5; top:40px; right:8px; width:220px; background:var(--panel); border:1px solid #363e4d; border-radius:12px; padding:8px; box-shadow:0 12px 30px rgba(0,0,0,.5); cursor:default; }
+  .pmenu .it { padding:6px 8px; border-radius:7px; cursor:pointer; font-size:13px; } .pmenu .it:hover { background:#252c3a; } .pmenu .it.on { color:var(--ok); }
+  .pmenu input { margin-top:6px; padding:7px 8px; font-size:13px; }
+  .pmenu .t { font-size:11.5px; color:var(--muted); margin:2px 4px 6px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-fold" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M12 10v6M9 13h6"/></symbol>
+  <symbol id="i-calc" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
+</svg>
+<header>
+  <div class="logo"></div>
+  <div><h1>Voxel Cut <span id="versao" style="font-size:12px;font-weight:500;color:var(--muted)"></span></h1><div class="s">Separe modelos em peças com pinos e encaixes, prontas pra qualquer fatiador</div></div>
+  <div class="sp"></div>
+  <span id="licChip" hidden></span>
+  <button id="calcHome" title="calculadora de custo e preço de venda" onclick="location.href='/calculadora'"><svg class="ic"><use href="#i-calc"/></svg>Calculadora</button>
+  <button id="folder" title="abrir a pasta onde ficam os projetos e as peças geradas"><svg class="ic"><use href="#i-folder"/></svg>Meus arquivos</button>
+</header>
+<main>
+  <div id="drop">
+    <div class="big"><svg class="ic big"><use href="#i-upload"/></svg></div>
+    <div class="t">Abrir um modelo (.stl ou .3mf)</div>
+    <div class="d">Clique para escolher o arquivo, ou arraste ele aqui para dentro</div>
+  </div>
+  <div id="saidaRow"><svg class="ic"><use href="#i-folder"/></svg><span>As peças prontas vão para <b id="saidaPath">…</b></span><button id="saidaMudar" type="button">Mudar</button></div>
+  <div id="barra"><h2>Projetos</h2><div id="pastas"></div>
+    <input type="search" id="busca" placeholder="Buscar projeto…" aria-label="buscar projeto">
+    <select id="ordem" aria-label="ordem"><option value="rec">Mais recentes</option><option value="nome">Nome (A-Z)</option><option value="alt">Mais altos</option></select></div>
+  <div id="grid"></div>
+</main>
+
+<div id="dlg"><div class="box">
+  <h3>Novo projeto</h3>
+  <div class="f" id="dlgFile"></div>
+  <label class="l">Nome do projeto</label>
+  <input type="text" id="dlgName">
+  <label class="l">Altura final da peça (mm)</label>
+  <input type="number" id="dlgHeight" placeholder="manter o tamanho original" min="0" step="1">
+  <div class="hint">Deixe em branco para usar o tamanho do arquivo. Ex.: 250 para 25 cm de altura.</div>
+  <div class="acts"><button id="dlgCancel">Cancelar</button><button class="primary" id="dlgOk">Abrir no cortador</button></div>
+</div></div>
+
+<div id="lic"><div class="box">
+  <div class="logo"></div>
+  <h3 id="licT">Ativar o Voxel Cut</h3>
+  <p id="licP">Cole aqui a chave de licença que você recebeu junto com o instalador.</p>
+  <div class="pcbox"><span>Código deste computador</span><b id="licPc">…</b><button id="licCopy" type="button">Copiar</button></div>
+  <textarea id="licKey" placeholder="VOXEL.eyJ2Ijox…" spellcheck="false"></textarea>
+  <div class="msg" id="licMsg"></div>
+  <div class="acts"><button class="primary" id="licOk">Ativar</button></div>
+</div></div>
+
+<div id="prog"><div class="box"><div class="spin"></div><div class="st" id="progSt">Preparando…</div><div class="lg" id="progLg"></div></div></div>
+
+<script>
+// messages that never freeze the page (a blocking alert() stops the heartbeat and the server would think the window closed)
+(function () {
+  const box = document.createElement("div");
+  box.style.cssText = "position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:8px;max-width:560px;width:calc(100% - 40px);pointer-events:none";
+  document.addEventListener("DOMContentLoaded", () => document.body.appendChild(box)); if (document.body) document.body.appendChild(box);
+  window.alert = (msg) => {
+    const d = document.createElement("div"); const err = /erro|falhou|não deu/i.test(msg);
+    d.style.cssText = `pointer-events:auto;background:${err ? "#3b1d22" : "#1f2638"};border:1px solid ${err ? "#f87171" : "#4b5b82"};color:#eceef2;padding:12px 38px 12px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.45);font:13px system-ui;position:relative;white-space:pre-wrap`;
+    d.textContent = (err ? "Atenção: " : "") + msg;
+    const x = document.createElement("button"); x.textContent = "✕"; x.style.cssText = "position:absolute;right:8px;top:8px;background:none;border:none;color:#aaa;cursor:pointer;font-size:14px"; x.onclick = () => d.remove(); d.appendChild(x);
+    box.appendChild(d); setTimeout(() => d.remove(), err ? 30000 : 9000);
+  };
+})();
+const $ = (id) => document.getElementById(id);
+let pending = null;   // {path} or {file}
+function ago(t) {
+  const s = Date.now() / 1000 - t;
+  if (s < 60) return "agora"; if (s < 3600) return `há ${Math.round(s / 60)} min`; if (s < 86400) return `há ${Math.round(s / 3600)} h`;
+  return new Date(t * 1000).toLocaleDateString("pt-BR");
+}
+let TODOS = [], PASTA = null;   // PASTA: null = todos, "" = sem pasta, "x" = pasta x
+try { PASTA = JSON.parse(localStorage.getItem("voxel_pasta") ?? "null"); $("ordem").value = localStorage.getItem("voxel_ordem") || "rec"; } catch (e) {}
+const semAcento = (t) => (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+async function load() {
+  TODOS = await (await fetch("/api/projects")).json(); render();
+}
+function pastasDe() { return [...new Set(TODOS.map((p) => p.pasta).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")); }
+function render() {
+  const pastas = pastasDe(), box = $("pastas");
+  if (PASTA && !pastas.includes(PASTA)) PASTA = null;
+  const conta = (f) => TODOS.filter(f).length;
+  const chips = [[null, "Todos", conta(() => true)]].concat(pastas.map((n) => [n, n, conta((p) => p.pasta === n)]));
+  if (pastas.length) chips.push(["", "Sem pasta", conta((p) => !p.pasta)]);
+  box.innerHTML = "";
+  if (TODOS.length) chips.forEach(([v, t, q]) => {
+    const c = document.createElement("span"); c.className = "chip" + (PASTA === v ? " on" : "");
+    c.innerHTML = (v ? '<svg class="ic" style="width:13px;height:13px"><use href="#i-folder"/></svg>' : "") + `<span></span><span class="q">${q}</span>`;
+    c.children[c.children.length - 2].textContent = t;
+    c.onclick = () => { PASTA = v; try { localStorage.setItem("voxel_pasta", JSON.stringify(PASTA)); } catch (e) {} render(); };
+    box.appendChild(c);
+  });
+  const q = semAcento($("busca").value.trim()), ordem = $("ordem").value;
+  let ps = TODOS.filter((p) => (PASTA === null || (p.pasta || "") === PASTA) && (!q || semAcento(p.name + " " + (p.pasta || "") + " " + (p.source || "")).includes(q)));
+  if (ordem === "nome") ps.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")); else if (ordem === "alt") ps.sort((a, b) => (b.height || 0) - (a.height || 0));
+  const g = $("grid"); g.innerHTML = "";
+  if (!TODOS.length) { g.innerHTML = `<div class="empty">Nenhum projeto ainda. Abra um modelo acima para começar.</div>`; g.style.display = "block"; return; }
+  if (!ps.length) { g.innerHTML = `<div class="empty">Nenhum projeto ${q ? "com esse nome" : "nesta pasta"}.</div>`; g.style.display = "block"; return; }
+  g.style.display = "";
+  for (const p of ps) {
+    const c = document.createElement("div"); c.className = "card";
+    c.innerHTML = `<div class="th" style="${p.thumb ? `background-image:url(/api/thumb/${p.id}?${p.modified})` : ""}">${p.thumb ? "" : '<svg class="ic" style="width:40px;height:40px"><use href="#i-cube"/></svg>'}</div>
+      <div class="b"><div class="n"></div><div class="m">${ago(p.modified)}${p.height ? ` · ${Math.round(p.height)} mm de altura` : ""}</div>
+      <div class="tags">${p.pasta ? `<span class="tag pasta"></span>` : ""}${p.groups ? `<span class="tag">${p.groups} peças</span>` : ""}${p.separated ? `<span class="tag">separado</span>` : ""}${p.generated ? `<span class="tag ok">✓ arquivos gerados</span>` : ""}</div></div>
+      <div class="menu"><button class="mov" title="pôr numa pasta"><svg class="ic"><use href="#i-fold"/></svg></button><button class="ren" title="renomear"><svg class="ic"><use href="#i-edit"/></svg></button><button class="del" title="apagar projeto"><svg class="ic"><use href="#i-trash"/></svg></button></div>`;
+    c.querySelector(".n").textContent = p.name; c.title = p.source || p.name;
+    if (p.pasta) c.querySelector(".tag.pasta").textContent = p.pasta;
+    c.onclick = async (e) => {
+      if (e.target.closest(".menu") || e.target.closest(".pmenu")) return;
+      showProg("Abrindo " + p.name + "…");
+      await fetch("/api/open", { method: "POST", body: JSON.stringify({ id: p.id }) }); location.href = "/cortar";
+    };
+    c.querySelector(".mov").onclick = (e) => { e.stopPropagation(); menuPasta(c, p); };
+    c.querySelector(".ren").onclick = async () => {
+      const n = prompt("Novo nome:", p.name); if (!n) return;
+      await fetch("/api/rename", { method: "POST", body: JSON.stringify({ id: p.id, name: n }) }); load();
+    };
+    c.querySelector(".del").onclick = async () => {
+      if (!confirm(`Apagar o projeto "${p.name}"? (os arquivos STL/3MF já gerados não são apagados)`)) return;
+      await fetch("/api/delete", { method: "POST", body: JSON.stringify({ id: p.id }) }); load();
+    };
+    g.appendChild(c);
+  }
+}
+function menuPasta(card, p) {
+  document.querySelectorAll(".pmenu").forEach((m) => m.remove());
+  const m = document.createElement("div"); m.className = "pmenu"; const pastas = pastasDe();
+  const t = document.createElement("div"); t.className = "t"; t.textContent = "Pôr numa pasta:"; m.appendChild(t);
+  const item = (txt, on, fn) => { const it = document.createElement("div"); it.className = "it" + (on ? " on" : ""); it.textContent = (on ? "✓ " : "") + txt; it.onclick = (e) => { e.stopPropagation(); fn(); }; m.appendChild(it); };
+  pastas.forEach((n) => item(n, p.pasta === n, () => mover(p, n)));
+  if (p.pasta) item("Tirar da pasta", false, () => mover(p, ""));
+  const inp = document.createElement("input"); inp.type = "text"; inp.placeholder = "Nova pasta (Enter)"; inp.maxLength = 60; m.appendChild(inp);
+  inp.onclick = (e) => e.stopPropagation();
+  inp.onkeydown = (e) => { if (e.key === "Enter" && inp.value.trim()) mover(p, inp.value.trim()); if (e.key === "Escape") m.remove(); };
+  card.appendChild(m); setTimeout(() => inp.focus(), 30);
+  setTimeout(() => document.addEventListener("click", function fora(e) { if (!m.contains(e.target)) { m.remove(); document.removeEventListener("click", fora); } }), 0);
+}
+async function mover(p, pasta) {
+  await fetch("/api/pasta", { method: "POST", body: JSON.stringify({ id: p.id, pasta }) }); load();
+}
+$("busca").oninput = render;
+$("ordem").onchange = () => { try { localStorage.setItem("voxel_ordem", $("ordem").value); } catch (e) {} render(); };
+function ask(label, name) { $("dlgFile").textContent = label; $("dlgName").value = name; $("dlgHeight").value = ""; $("dlg").style.display = "grid"; $("dlgName").focus(); $("dlgName").select(); }
+$("dlgCancel").onclick = () => { $("dlg").style.display = "none"; pending = null; };
+$("drop").onclick = async () => {
+  const r = await (await fetch("/api/pick_file", { method: "POST", body: "{}" })).json();
+  if (!r.path) return;
+  pending = { path: r.path }; ask(r.path, r.path.split(/[\\/]/).pop().replace(/\.(stl|3mf)$/i, ""));
+};
+const dz = $("drop");
+["dragenter", "dragover"].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add("over"); }));
+["dragleave", "drop"].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); if (ev === "drop" || e.target === document.documentElement) dz.classList.remove("over"); }));
+document.addEventListener("drop", (e) => {
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  if (!/\.(stl|3mf)$/i.test(f.name)) { alert("Use um arquivo .stl ou .3mf"); return; }
+  pending = { file: f }; ask(`${f.name} (${(f.size / 1e6).toFixed(1)} MB)`, f.name.replace(/\.(stl|3mf)$/i, ""));
+});
+$("dlgOk").onclick = async () => {
+  const name = $("dlgName").value.trim() || "modelo", height = +$("dlgHeight").value || 0;
+  $("dlg").style.display = "none"; showProg("Enviando o arquivo…");
+  let r;
+  if (pending.path) r = await fetch("/api/import", { method: "POST", body: JSON.stringify({ path: pending.path, name, height }) });
+  else r = await fetch(`/api/upload?name=${encodeURIComponent(name)}&file=${encodeURIComponent(pending.file.name)}&height=${height}`, { method: "POST", body: pending.file });
+  if (!r.ok) { hideProg(); alert("Não deu: " + ((await r.json()).error || r.status)); return; }
+  while (true) {
+    await new Promise((res) => setTimeout(res, 800));
+    const st = await (await fetch("/api/state")).json();
+    $("progSt").textContent = st.stage[0].toUpperCase() + st.stage.slice(1) + "…"; $("progLg").textContent = st.log.slice(-2).join("\n");
+    if (!st.busy) {
+      if (st.error) { hideProg(); alert("Deu erro ao abrir o arquivo: " + st.error); return; }
+      location.href = "/cortar"; return;
+    }
+  }
+};
+$("dlgName").onkeydown = $("dlgHeight").onkeydown = (e) => { if (e.key === "Enter") $("dlgOk").click(); if (e.key === "Escape") $("dlgCancel").click(); };
+$("folder").onclick = () => fetch("/api/open_folder", { method: "POST", body: "{}" });
+function showProg(t) { $("progSt").textContent = t; $("progLg").textContent = ""; $("prog").style.display = "grid"; }
+function hideProg() { $("prog").style.display = "none"; }
+const JANELA = Math.random().toString(36).slice(2);          // esta janela: avisa que está aberta e avisa quando fecha (aí o Voxel encerra)
+const pingar = () => fetch("/api/ping", { method: "POST", body: JSON.stringify({ janela: JANELA }) }).catch(() => {});
+setInterval(pingar, 4000); pingar();
+addEventListener("pagehide", () => navigator.sendBeacon("/api/bye", JSON.stringify({ janela: JANELA })));
+// ---------- licença
+const LIC_MSG = {
+  sem_licenca: ["Ativar o Voxel Cut", "Mande o código deste computador para a {v} e cole aqui a chave que você receber. A chave funciona só neste computador."],
+  outro_pc: ["Essa chave é de outro computador", "Cada licença funciona só no computador cadastrado. Mande o código abaixo para a {v} e peça a chave deste computador."],
+  invalida: ["Chave de licença inválida", "Essa chave não é válida. Confira se copiou ela inteira (começa com VOXEL.) e cole de novo."],
+  vencida: ["Sua assinatura venceu", "A licença venceu. Renove a assinatura com a {v} e cole aqui a chave nova. Seus projetos continuam salvos."],
+  relogio: ["Confira a data do computador", "A data do Windows parece estar atrasada. Acerte a data e a hora e abra o programa de novo."],
+};
+const fmtD = (s) => s.split("-").reverse().join("/");
+function showLic(st, fromTry) {
+  const [t, p] = LIC_MSG[st.motivo] || LIC_MSG.sem_licenca;
+  $("licT").textContent = fromTry ? LIC_MSG.sem_licenca[0] : t; $("licP").textContent = (fromTry ? LIC_MSG.sem_licenca[1] : p).replace("{v}", st.vendedor || "Voxel");
+  if (st.motivo === "vencida" && st.ate) $("licP").textContent += ` (venceu em ${fmtD(st.ate)})`;
+  $("licMsg").textContent = fromTry ? p.replace("{v}", st.vendedor || "Voxel") : "";
+  if (st.codigo) $("licPc").textContent = st.codigo;
+  $("lic").style.display = "grid"; $("licKey").focus();
+}
+function chip(st) {
+  if (!st.required || !st.ok) return;
+  const c = $("licChip"); c.hidden = false;
+  c.textContent = st.dias <= 7 ? `Assinatura vence ${st.dias === 0 ? "hoje" : `em ${st.dias} dia${st.dias > 1 ? "s" : ""}`}` : `Licenciado para ${st.nome} · até ${fmtD(st.ate)}`;
+  c.classList.toggle("warn", st.dias <= 7);
+  c.title = "clique para trocar a chave de licença";
+  c.onclick = () => showLic({ motivo: "sem_licenca" });
+  if (st.dias <= 7) alert(`Sua assinatura do Voxel Cut vence ${st.dias === 0 ? "hoje" : `em ${st.dias} dia(s)`} (${fmtD(st.ate)}). Fale com a ${st.vendedor} para renovar.`);
+}
+$("licCopy").onclick = async () => {
+  const c = $("licPc").textContent;
+  try { await navigator.clipboard.writeText(c); $("licCopy").textContent = "Copiado"; } catch (e) { const r = document.createRange(); r.selectNodeContents($("licPc")); getSelection().removeAllRanges(); getSelection().addRange(r); }
+  setTimeout(() => { $("licCopy").textContent = "Copiar"; }, 1600);
+};
+$("licOk").onclick = async () => {
+  const key = $("licKey").value.trim(); if (!key) return;
+  const st = await (await fetch("/api/license", { method: "POST", body: JSON.stringify({ key }) })).json();
+  if (!st.ok) { showLic(st, true); return; }
+  $("lic").style.display = "none"; $("licKey").value = "";
+  alert(`Pronto! Voxel Cut ativado para ${st.nome}, válido até ${fmtD(st.ate)}.`); chip(st); load();
+};
+(async () => {
+  const r = await fetch("/api/license");
+  if (r.status === 404) { load(); return; }          // servidor antigo ainda ligado (sem licença)
+  const st = await r.json();
+  if (!st.ok) { showLic(st); return; }
+  chip(st); load();
+})();
+fetch("/api/state").then((r) => r.json()).then((s) => { if (s.versao) $("versao").textContent = "versão " + s.versao; }).catch(() => {});
+function mostrarSaida(d) { if (d && d.saida) { $("saidaPath").textContent = d.saida; $("saidaPath").title = d.saida; } }
+fetch("/api/prefs", { method: "POST", body: "{}" }).then((r) => r.json()).then(mostrarSaida).catch(() => {});
+$("saidaMudar").onclick = async () => mostrarSaida(await (await fetch("/api/prefs", { method: "POST", body: JSON.stringify({ escolher: true }) })).json());
+</script>
+</body>
+</html>

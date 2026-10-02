@@ -1,0 +1,59 @@
+# Repositório do Voxel Cut: só o código do programa e os scripts que montam o instalador.
+# A pasta Documentos\Voxel também tem marketing, Instagram, marca e modelos: nada disso entra.
+/*
+!/.gitignore
+!/README.md
+!/Cortador Voxel/
+!/_instalador/
+
+# ---------- licenças: chave secreta, clientes e chaves emitidas (NUNCA no repositório)
+_licencas/
+**/_licencas/
+licenca.txt
+**/licenca.txt
+CHAVE_SECRETA*
+**/CHAVE_SECRETA*
+clientes.csv
+**/clientes.csv
+emitidas/
+
+# ---------- pacotes e builds
+*.zip
+_instalador/stage/
+_instalador/saida/
+_instalador/portatil/
+_instalador/mac/
+build/
+dist/
+*.exe
+*.msi
+*.dmg
+
+# ---------- projetos, peças geradas e dados de teste
+Cortador Voxel/projetos/
+**/projetos/
+**/Arquivos gerados/
+**/_gravacao*/
+**/_desfazer/
+**/_build/
+*.stl
+*.3mf
+*.npy
+*.npz
+
+# ---------- Python e ambientes virtuais
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.env
+
+# ---------- diversos
+*.log
+*.lnk
+Cortador Voxel/_backups_codigo/
+preferencias.json
+.claude/
+Thumbs.db
+desktop.ini

@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora de preço · Voxel Cut</title>
+<link rel="icon" href="/icon.png">
+<style>
+  /* Calculadora de preço do Voxel Cut: entradas em cartões à esquerda, resultado fixo à direita */
+  :root {
+    --bg:#0B0E14; --panel:#121823; --panel2:#171f2d; --line:#253044; --field:#0d121b;
+    --fg:#e9edf4; --muted:#93a0b6; --dim:#667189;
+    --blue:#3B82F6; --mint:#10B981; --warn:#fbbf24; --bad:#f87171;
+    --c-fil:#3B82F6; --c-ene:#f2c12e; --c-des:#a855f7; --c-mao:#10B981; --c-ext:#f97316; --c-ris:#ef4444;
+    --ui:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; --display:"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif; --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; min-height:100%; }
+  body { background:radial-gradient(ellipse at 50% -20%, #16223a 0%, var(--bg) 60%) fixed var(--bg); color:var(--fg); font:14px/1.45 var(--ui); }
+  [hidden] { display:none !important; }
+  .wrap { max-width:1220px; margin:0 auto; padding-inline:24px; padding-block:18px 40px; }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .back { display:grid; place-items:center; width:34px; height:34px; border-radius:10px; color:var(--muted); text-decoration:none; border:1px solid var(--line); background:var(--panel); }
+  .back:hover { color:var(--fg); border-color:#3b4a66; }
+  .logo { width:34px; height:34px; background:url(/logo.png) center/contain no-repeat; flex:none; }
+  h1 { margin:0; font:600 19px var(--display); }
+  header p { margin:1px 0 0; color:var(--muted); font-size:12.5px; }
+  .sp { flex:1; }
+  .proj { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12.5px; }
+  .proj select { background:var(--field); border:1px solid var(--line); color:var(--fg); border-radius:9px; padding:7px 9px; font:inherit; max-width:260px; }
+  .aviso { display:flex; align-items:center; gap:10px; background:rgba(59,130,246,.1); border:1px solid rgba(59,130,246,.4); border-radius:12px; padding:10px 14px; margin-bottom:14px; font-size:13px; color:#cfe0ff; flex-wrap:wrap; }
+  .aviso span { flex:1; min-width:220px; }
+  .grid { display:grid; grid-template-columns:minmax(0,1fr) 370px; gap:16px; align-items:start; }
+  .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; min-width:0; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px 15px 15px; min-width:0; }
+  .card.wide { grid-column:1 / -1; }
+  .card h2 { margin:0 0 8px; font:600 11.5px var(--ui); letter-spacing:.09em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:8px; }
+  .card h2 i { width:9px; height:9px; border-radius:3px; display:inline-block; }
+  .card h2 em { font-style:normal; text-transform:none; letter-spacing:0; color:var(--dim); font-weight:400; margin-left:auto; }
+  .f { display:grid; grid-template-columns:minmax(0,1fr) 168px; align-items:center; column-gap:10px; row-gap:0; margin:7px 0; font-size:13px; color:#cbd3e1; }
+  .f > .in, .f > .two { grid-column:2; grid-row:1 / span 2; }
+  .f small { grid-column:1; display:block; color:var(--dim); font-size:11.5px; line-height:1.3; }
+  .in { display:flex; align-items:center; background:var(--field); border:1px solid var(--line); border-radius:9px; overflow:hidden; }
+  .in:focus-within { border-color:var(--blue); box-shadow:0 0 0 3px rgba(59,130,246,.18); }
+  .in input, .in select { width:100%; min-width:0; background:transparent; border:0; color:var(--fg); font:500 13.5px var(--mono); padding:7px 9px; outline:none; text-align:right; }
+  .in select { text-align:left; font:500 12.5px var(--ui); cursor:pointer; }
+  .in select option { background:var(--panel); }
+  .in b { font:500 12px var(--ui); color:var(--dim); padding:0 9px 0 0; white-space:nowrap; }
+  .in b.pre { padding:0 0 0 9px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:6px; } .two .in input { padding-inline:6px; } .two .in b { padding-right:6px; }
+  .fils { display:grid; gap:6px; }
+  .fil { display:grid; grid-template-columns:14px minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 30px; gap:6px; align-items:center; }
+  .fil .sw { width:12px; height:12px; border-radius:4px; background:var(--dim); }
+  .fil input.nome { background:var(--field); border:1px solid var(--line); border-radius:9px; color:var(--fg); font:500 13px var(--ui); padding:7px 9px; min-width:0; outline:none; }
+  .fil input.nome:focus { border-color:var(--blue); }
+  .head { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.07em; }
+  .x { background:none; border:0; color:var(--dim); cursor:pointer; font-size:16px; border-radius:7px; height:30px; }
+  .x:hover { color:var(--bad); background:rgba(248,113,113,.08); }
+  .btn { background:rgba(255,255,255,.05); border:1px solid var(--line); color:#cbd3e1; border-radius:9px; padding:7px 12px; font:500 13px var(--ui); cursor:pointer; }
+  .btn:hover { border-color:#3b4a66; color:var(--fg); }
+  .btn.pri { background:linear-gradient(135deg,var(--blue),var(--mint)); border:0; color:#fff; font-weight:600; }
+  .note { color:var(--dim); font-size:11.5px; line-height:1.45; }
+  :focus-visible { outline:2px solid var(--mint); outline-offset:2px; }
+  .res { position:sticky; top:16px; background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid #2c3a55; border-radius:16px; padding:18px; box-shadow:0 18px 50px rgba(0,0,0,.35); min-width:0; }
+  .res .lab { font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+  .price { font:700 42px/1.05 var(--display); margin:6px 0 2px; font-variant-numeric:tabular-nums; }
+  .sub { color:var(--muted); font-size:12.5px; }
+  .kpis { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:14px 0; }
+  .kpi { background:var(--field); border:1px solid var(--line); border-radius:11px; padding:8px 11px; }
+  .kpi .v { font:600 16px var(--mono); font-variant-numeric:tabular-nums; }
+  .kpi .v.ok { color:var(--mint); } .kpi .v.bad { color:var(--bad); }
+  .kpi .k { font-size:11.5px; color:var(--muted); }
+  .bar { display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--field); margin:6px 0 10px; }
+  .bar span { height:100%; }
+  .rows { display:grid; gap:3px; font-size:12.5px; }
+  .row { display:grid; grid-template-columns:12px minmax(0,1fr) auto 44px; gap:8px; align-items:center; }
+  .row i { width:10px; height:10px; border-radius:3px; }
+  .row .v { font:500 12.5px var(--mono); text-align:right; font-variant-numeric:tabular-nums; }
+  .row .p { color:var(--dim); font:12px var(--mono); text-align:right; }
+  .row.tot { border-top:1px solid var(--line); padding-top:6px; margin-top:4px; font-weight:600; }
+  .acts { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .acts .btn { flex:1; }
+  #copiado { color:var(--mint); font-size:12px; min-height:16px; margin-top:6px; }
+  .warn { color:var(--warn); font-size:12px; margin-top:8px; }
+  #salvo { color:var(--dim); font-size:11.5px; }
+  @media (max-width: 960px) { .grid { grid-template-columns:minmax(0,1fr); } .res { position:static; order:-1; } }
+  @media (max-width: 640px) { .cards { grid-template-columns:minmax(0,1fr); } .wrap { padding-inline:16px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" id="voltar" href="/" title="voltar" aria-label="voltar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></a>
+    <span class="logo" aria-hidden="true"></span>
+    <div><h1>Calculadora de preço</h1><p>Custo e preço de venda da peça impressa</p></div>
+    <span class="sp"></span>
+    <label class="proj">Projeto <select id="projeto"><option value="">Sem projeto (avulso)</option></select></label>
+    <span id="salvo"></span>
+  </header>
+
+  <div class="aviso" id="avisoEst" hidden>
+    <span id="avisoTxt"></span>
+    <button class="btn" id="usarEst" type="button">Usar a estimativa do Voxel</button>
+  </div>
+
+  <div class="grid">
+    <div class="cards">
+      <section class="card wide" aria-labelledby="t-fil">
+        <h2 id="t-fil"><i style="background:var(--c-fil)"></i>Filamento<em>gramas do fatiador, já com suporte e purga</em></h2>
+        <div class="fil head" aria-hidden="true"><span></span><span>Filamento</span><span>R$ / kg</span><span>Gramas</span><span></span></div>
+        <div class="fils" id="fils"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+          <button class="btn" id="addFil" type="button">+ Outra cor</button>
+        </div>
+        <label class="f" style="margin-top:10px">Perda (sobra de bobina, teste)<small>somado ao filamento</small><span class="in"><input id="perda" type="number" min="0" step="1"><b>%</b></span></label>
+      </section>
+
+      <section class="card" aria-labelledby="t-imp">
+        <h2 id="t-imp"><i style="background:var(--c-ene)"></i>Impressão e energia</h2>
+        <label class="f">Tempo de impressão<small>soma dos pratos, como o fatiador mostra</small><span class="two"><span class="in"><input id="horas" type="number" min="0" step="1"><b>h</b></span><span class="in"><input id="minutos" type="number" min="0" max="59" step="1"><b>min</b></span></span></label>
+        <label class="f">Valor do kWh<small>média Brasil 2026 com impostos ≈ R$ 1,10</small><span class="in"><b class="pre">R$</b><input id="kwh" type="number" min="0" step="0.01"></span></label>
+        <label class="f">Bandeira da conta<small>soma por kWh</small><span class="in"><select id="bandeira"><option value="0">Verde</option><option value="0.01885">Amarela (+0,019)</option><option value="0.04463">Vermelha 1 (+0,045)</option><option value="0.07877">Vermelha 2 (+0,079)</option></select></span></label>
+        <label class="f">Peças iguais na impressão<small>divide o custo da máquina</small><span class="in"><input id="qtd" type="number" min="1" step="1"><b>un</b></span></label>
+      </section>
+
+      <section class="card" aria-labelledby="t-maq">
+        <h2 id="t-maq"><i style="background:var(--c-des)"></i>Impressora</h2>
+        <label class="f">Modelo<small>preenche consumo e preço</small><span class="in"><select id="modelo"></select></span></label>
+        <label class="f">Consumo médio imprimindo<small>PLA, mesa a 55–65 °C</small><span class="in"><input id="watts" type="number" min="0" step="5"><b>W</b></span></label>
+        <label class="f">Preço da impressora<small>o que você pagou</small><span class="in"><b class="pre">R$</b><input id="precoImp" type="number" min="0" step="50"></span></label>
+        <label class="f">Vida útil<small>horas até trocar de máquina</small><span class="in"><input id="vida" type="number" min="1" step="500"><b>h</b></span></label>
+        <label class="f">Manutenção<small>bico, correia, placa</small><span class="in"><b class="pre">R$</b><input id="manut" type="number" min="0" step="0.05"><b>/h</b></span></label>
+      </section>
+
+      <section class="card" aria-labelledby="t-mao">
+        <h2 id="t-mao"><i style="background:var(--c-mao)"></i>Mão de obra e extras</h2>
+        <label class="f">Seu trabalho<small>tirar suporte, lixar, colar, pintar</small><span class="two"><span class="in"><input id="hTrab" type="number" min="0" step="0.25"><b>h</b></span><span class="in"><input id="valorHora" type="number" min="0" step="1"><b>R$/h</b></span></span></label>
+        <label class="f">Materiais extras<small>tinta, primer, cola, ímã</small><span class="in"><b class="pre">R$</b><input id="extras" type="number" min="0" step="0.5"></span></label>
+        <label class="f">Embalagem<small>caixa, plástico bolha</small><span class="in"><b class="pre">R$</b><input id="embalagem" type="number" min="0" step="0.5"></span></label>
+        <label class="f">Risco de falha<small>sobre o custo da impressão</small><span class="in"><input id="falha" type="number" min="0" step="1"><b>%</b></span></label>
+      </section>
+
+      <section class="card" aria-labelledby="t-pre">
+        <h2 id="t-pre"><i style="background:linear-gradient(135deg,var(--blue),var(--mint))"></i>Preço de venda</h2>
+        <label class="f">Margem de lucro<small>sobre o custo total</small><span class="in"><input id="margem" type="number" min="0" step="5"><b>%</b></span></label>
+        <label class="f">Taxa da plataforma<small>Shopee, Mercado Livre, Elo7</small><span class="in"><input id="taxaPlat" type="number" min="0" step="0.5"><b>%</b></span></label>
+        <label class="f">Taxa do cartão / Pix<small>maquininha, link</small><span class="in"><input id="taxaCartao" type="number" min="0" step="0.1"><b>%</b></span></label>
+        <label class="f">Imposto<small>MEI: 0 · Simples: 4–6%</small><span class="in"><input id="imposto" type="number" min="0" step="0.5"><b>%</b></span></label>
+        <label class="f">Arredondar o preço<small>pra cima</small><span class="in"><select id="arred"><option value="0">não arredondar</option><option value="90">terminar em ,90</option><option value="100">real inteiro</option><option value="500">múltiplo de 5</option></select></span></label>
+      </section>
+    </div>
+
+    <aside class="res" aria-live="polite">
+      <div class="lab">Preço sugerido por peça</div>
+      <div class="price" id="preco">R$ 0,00</div>
+      <div class="sub" id="precoSub"></div>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kCusto">–</div><div class="k">custo por peça</div></div>
+        <div class="kpi"><div class="v ok" id="kLucro">–</div><div class="k">lucro por peça</div></div>
+        <div class="kpi"><div class="v" id="kHora">–</div><div class="k">custo por hora de máquina</div></div>
+        <div class="kpi"><div class="v" id="kG">–</div><div class="k">filamento por peça</div></div>
+      </div>
+      <div class="lab">De onde vem o custo</div>
+      <div class="bar" id="bar" role="img" aria-label="divisão do custo"></div>
+      <div class="rows" id="rows"></div>
+      <div class="warn" id="aviso" hidden></div>
+      <div class="acts"><button class="btn pri" id="copiar" type="button">Copiar orçamento</button></div>
+      <div id="copiado"></div>
+      <div class="note">Valores de referência (out/2026): kWh médio da Aneel com impostos e consumo da Bambu Lab imprimindo PLA (A1 95 W, P1S 120 W; os outros modelos são aproximados). Confira o kWh na sua conta de luz e coloque o preço que você pagou na impressora.</div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const MODELOS = [
+  ["Bambu Lab A1 mini", 80, 2300], ["Bambu Lab A1", 95, 3600], ["Bambu Lab P1S", 120, 6000], ["Bambu Lab P1P", 110, 4500],
+  ["Bambu Lab X1C", 150, 10500], ["Bambu Lab H2D", 200, 16000], ["Creality K1 / K1C", 140, 3800], ["Creality Ender 3 V3", 120, 1800],
+  ["Prusa MK4", 110, 6500], ["Elegoo Neptune 4", 120, 1900], ["Outra", null, null],
+];
+const GERAL = { perda: 5, kwh: 1.10, bandeira: "0", modelo: "2", watts: 120, precoImp: 6000, vida: 5000, manut: 0.30, valorHora: 25, falha: 10,
+  margem: 80, taxaPlat: 0, taxaCartao: 3, imposto: 0, arred: "90", kgPadrao: 120 };
+const PROJ = { fils: [{ nome: "Filamento", kg: 120, g: 0 }], horas: 0, minutos: 0, qtd: 1, hTrab: 1, extras: 0, embalagem: 6 };
+const CG = ["perda", "kwh", "bandeira", "modelo", "watts", "precoImp", "vida", "manut", "valorHora", "falha", "margem", "taxaPlat", "taxaCartao", "imposto", "arred"];
+const CP = ["horas", "minutos", "qtd", "hTrab", "extras", "embalagem"];
+const $ = (id) => document.getElementById(id);
+const brl = (v) => (isFinite(v) ? v : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const num = (id) => { const v = parseFloat(String($(id).value).replace(",", ".")); return isFinite(v) ? v : 0; };
+let fils = [], geral = { ...GERAL }, pid = new URLSearchParams(location.search).get("projeto") || "", sugestao = null, dados = null;
+
+// esta janela avisa o programa que está aberta (senão ele fecha sozinho)
+const JANELA = Math.random().toString(36).slice(2);
+const pingar = () => fetch("/api/ping", { method: "POST", body: JSON.stringify({ janela: JANELA }) }).catch(() => {});
+setInterval(pingar, 4000); pingar();
+addEventListener("pagehide", () => navigator.sendBeacon("/api/bye", JSON.stringify({ janela: JANELA })));
+if (new URLSearchParams(location.search).get("de") === "cortar") $("voltar").href = "/cortar";
+
+MODELOS.forEach(([n], i) => $("modelo").add(new Option(n, String(i))));
+
+function linhaFil(f, i) {
+  const d = document.createElement("div"); d.className = "fil";
+  d.innerHTML = `<span class="sw"></span><input class="nome" id="fn${i}" aria-label="nome do filamento" maxlength="40">
+    <span class="in"><b class="pre">R$</b><input id="fk${i}" type="number" min="0" step="1" aria-label="preço por kg"></span>
+    <span class="in"><input id="fg${i}" type="number" min="0" step="1" aria-label="gramas"><b>g</b></span>
+    <button class="x" type="button" title="tirar esta cor" aria-label="tirar esta cor">×</button>`;
+  if (f.cor) d.querySelector(".sw").style.background = f.cor;
+  const [n, k, g] = d.querySelectorAll("input"); n.value = f.nome; k.value = f.kg; g.value = f.g;
+  n.oninput = () => { f.nome = n.value; mudou(); };
+  k.oninput = () => { f.kg = parseFloat(k.value) || 0; geral.kgPadrao = f.kg; mudou(); };
+  g.oninput = () => { f.g = parseFloat(g.value) || 0; mudou(); };
+  d.querySelector(".x").onclick = () => { if (fils.length > 1) { fils.splice(i, 1); montaFils(); mudou(); } };
+  return d;
+}
+function montaFils() { const box = $("fils"); box.innerHTML = ""; fils.forEach((f, i) => box.appendChild(linhaFil(f, i))); }
+$("addFil").onclick = () => { fils.push({ nome: `Cor ${fils.length + 1}`, kg: geral.kgPadrao || 120, g: 0 }); montaFils(); mudou(); $("fg" + (fils.length - 1)).focus(); };
+
+function daSugestao() {
+  const s = sugestao; if (!s) return { ...PROJ, fils: PROJ.fils.map((f) => ({ ...f, kg: geral.kgPadrao || 120 })) };
+  return { ...PROJ, fils: (s.fils.length ? s.fils : PROJ.fils).map((f) => ({ nome: f.nome, cor: f.cor, kg: geral.kgPadrao || 120, g: f.g })), horas: Math.floor(s.min / 60), minutos: s.min % 60 };
+}
+function preenche(p) {
+  CG.forEach((c) => { $(c).value = geral[c] ?? GERAL[c]; });
+  fils = (p.fils || PROJ.fils).map((f) => ({ ...f }));
+  CP.forEach((c) => { $(c).value = p[c] ?? PROJ[c]; });
+  montaFils(); calc();
+}
+function coleta() {
+  CG.forEach((c) => (geral[c] = $(c).value));
+  const p = { fils: fils.map((f) => ({ ...f })) }; CP.forEach((c) => (p[c] = $(c).value)); return p;
+}
+let tSalvar = null;
+function mudou() {
+  calc(); $("salvo").textContent = "";
+  clearTimeout(tSalvar);
+  tSalvar = setTimeout(async () => {
+    const p = coleta(); const corpo = { geral: { ...geral } };
+    if (pid) { corpo.projeto_id = pid; corpo.projeto = p; } else corpo.geral.avulso = p;
+    try { await fetch("/api/calc", { method: "POST", body: JSON.stringify(corpo) }); $("salvo").textContent = "salvo"; } catch (e) {}
+  }, 600);
+}
+$("modelo").onchange = () => { const [, w, pr] = MODELOS[+$("modelo").value]; if (w) { $("watts").value = w; $("precoImp").value = pr; } mudou(); };
+
+async function carregar() {
+  dados = await (await fetch("/api/calc" + (pid ? `?projeto=${encodeURIComponent(pid)}` : ""))).json();
+  geral = { ...GERAL, ...(dados.geral || {}) }; sugestao = dados.sugestao;
+  const sel = $("projeto"); sel.length = 1; (dados.projetos || []).forEach((x) => sel.add(new Option(x.name, x.id))); sel.value = pid;
+  const av = $("avisoEst");
+  if (pid && sugestao && sugestao.min) {
+    av.hidden = false;
+    $("avisoTxt").textContent = `${sugestao.nome}: o Voxel Cut estimou ${sugestao.fils.reduce((a, f) => a + f.g, 0)} g e ${Math.floor(sugestao.min / 60)}h${String(sugestao.min % 60).padStart(2, "0")} de impressão. É aproximado: depois de fatiar, troque pelos gramas e pelo tempo que o fatiador mostrar.`;
+  } else if (pid) { av.hidden = false; $("avisoTxt").textContent = "Esse projeto ainda não tem estimativa: visualize os encaixes ou gere os arquivos, ou digite os gramas e o tempo do fatiador."; }
+  else av.hidden = true;
+  $("usarEst").hidden = !(pid && sugestao && sugestao.min);
+  preenche(pid ? (dados.projeto || daSugestao()) : (geral.avulso || daSugestao()));
+}
+$("usarEst").onclick = () => { const p = daSugestao(); fils = p.fils; ["horas", "minutos"].forEach((c) => ($(c).value = p[c])); montaFils(); mudou(); };
+$("projeto").onchange = () => { pid = $("projeto").value; history.replaceState(null, "", "/calculadora" + (pid ? `?projeto=${encodeURIComponent(pid)}` : "")); carregar(); };
+
+function arredonda(v, modo) {
+  if (modo === "90") return Math.ceil(v + 0.1) - 0.10;
+  if (modo === "100") return Math.ceil(v);
+  if (modo === "500") return Math.ceil(v / 5) * 5;
+  return v;
+}
+let texto = "";
+function calc() {
+  const h = num("horas") + num("minutos") / 60, qtd = Math.max(1, Math.round(num("qtd")));
+  const g = fils.reduce((a, f) => a + (f.g || 0), 0);
+  const fil = fils.reduce((a, f) => a + (f.g || 0) / 1000 * (f.kg || 0), 0) * (1 + num("perda") / 100);
+  const ene = h * num("watts") / 1000 * (num("kwh") + parseFloat($("bandeira").value));
+  const des = h * (num("precoImp") / Math.max(1, num("vida")) + num("manut"));
+  const ris = (fil + ene + des) * num("falha") / 100;
+  const mao = num("hTrab") * num("valorHora"), ext = num("extras") + num("embalagem");
+  const pp = { fil: fil / qtd, ene: ene / qtd, des: des / qtd, ris: ris / qtd, mao, ext };   // impressão dividida pelas peças; o resto é por peça
+  const custo = Object.values(pp).reduce((a, b) => a + b, 0);
+  const taxas = (num("taxaPlat") + num("taxaCartao") + num("imposto")) / 100;
+  $("aviso").hidden = taxas < 0.95; $("aviso").textContent = "As taxas somam quase 100% do preço: confira os campos de taxa e imposto.";
+  const preco = arredonda(custo * (1 + num("margem") / 100) / Math.max(0.05, 1 - taxas), $("arred").value);
+  const lucro = preco * (1 - taxas) - custo;
+  const hTxt = `${Math.floor(h)}h${String(Math.round((h % 1) * 60)).padStart(2, "0")}`;
+  $("preco").textContent = brl(preco);
+  $("precoSub").textContent = qtd > 1 ? `${qtd} peças na impressão: ${brl(preco * qtd)} no total` : `${hTxt} de máquina`;
+  $("kCusto").textContent = brl(custo);
+  const kl = $("kLucro"); kl.textContent = brl(lucro); kl.className = "v " + (lucro >= 0 ? "ok" : "bad");
+  $("kHora").textContent = h > 0 ? brl((ene + des) / h) : "–";
+  $("kG").textContent = `${Math.round(g / qtd)} g`;
+  const itens = [["Filamento", pp.fil, "--c-fil"], ["Energia", pp.ene, "--c-ene"], ["Desgaste da impressora", pp.des, "--c-des"], ["Mão de obra", pp.mao, "--c-mao"],
+    ["Extras e embalagem", pp.ext, "--c-ext"], ["Risco de falha", pp.ris, "--c-ris"]];
+  $("bar").innerHTML = itens.filter((x) => x[1] > 0).map(([n, v, c]) => `<span title="${n}: ${brl(v)}" style="width:${(v / (custo || 1)) * 100}%;background:var(${c})"></span>`).join("");
+  $("rows").innerHTML = itens.map(([n, v, c]) => `<div class="row"><i style="background:var(${c})"></i><span>${n}</span><span class="v">${brl(v)}</span><span class="p">${custo ? Math.round(v / custo * 100) : 0}%</span></div>`).join("") +
+    `<div class="row tot"><i></i><span>Custo total</span><span class="v">${brl(custo)}</span><span class="p">100%</span></div>`;
+  const nomeP = pid && $("projeto").selectedOptions[0] ? $("projeto").selectedOptions[0].text : "";
+  texto = `Orçamento${nomeP ? " · " + nomeP : ""}\n` + fils.filter((f) => f.g > 0).map((f) => `• ${f.nome}: ${Math.round(f.g / qtd)} g`).join("\n") +
+    `\n• Impressão: ${hTxt}${qtd > 1 ? ` (${qtd} peças)` : ""}\n\nCusto por peça: ${brl(custo)}\nPreço por peça: ${brl(preco)}${qtd > 1 ? `\nTotal (${qtd} peças): ${brl(preco * qtd)}` : ""}\nLucro por peça: ${brl(lucro)}`;
+}
+document.addEventListener("input", (e) => { if (CG.includes(e.target.id) || CP.includes(e.target.id)) mudou(); });
+document.addEventListener("change", (e) => { if ((CG.includes(e.target.id) || CP.includes(e.target.id)) && e.target.id !== "modelo") mudou(); });
+$("copiar").onclick = async () => {
+  try { await navigator.clipboard.writeText(texto); $("copiado").textContent = "Copiado. É só colar no WhatsApp ou no direct."; }
+  catch (e) { $("copiado").textContent = "Não deu pra copiar automaticamente."; }
+  setTimeout(() => ($("copiado").textContent = ""), 4000);
+};
+carregar().catch(() => { preenche(daSugestao()); });
+</script>
+</body>
+</html>
